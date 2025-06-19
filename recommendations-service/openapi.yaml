@@ -1,0 +1,160 @@
+openapi: 3.0.0
+info:
+  title: API Сервис Персонализированных Рекомендаций
+  version: 1.0.0
+  description: |
+    API Сервис предоставляет персонализированные рекомендации товаров для пользователей.
+    Он использует различные источники данных (эмбеддинги, фичи, A/B тесты) и ML-модели
+    для генерации и ранжирования предложений, а также кэширует результаты для быстрого доступа.
+servers:
+  - url: https://api.your-marketplace.com/recommendations/v1
+    description: Production server
+  - url: http://localhost:8080/recommendations/v1
+    description: Local development server
+
+paths:
+  /users/{user_id}/items:
+    get:
+      summary: Получить персонализированные рекомендации товаров для пользователя
+      operationId: getRecommendationsForUser
+      parameters:
+        - in: path
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Уникальный идентификатор пользователя
+        - in: query
+          name: count
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          required: false
+          description: Количество запрашиваемых рекомендаций
+        - in: query
+          name: context_page_type
+          schema:
+            type: string
+            enum: [homepage, product_page, cart, category_page, search_results]
+          required: false
+          description: Тип страницы, с которой делается запрос рекомендаций
+        - in: query
+          name: device_type
+          schema:
+            type: string
+            enum: [mobile, desktop, tablet]
+          required: false
+          description: Тип устройства пользователя
+        - in: query
+          name: session_id
+          schema:
+            type: string
+            format: uuid
+          required: false
+          description: Уникальный идентификатор текущей пользовательской сессии (для логирования и A/B тестов)
+      responses:
+        '200':
+          description: Успешный ответ с рекомендациями
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    format: uuid
+                    description: Идентификатор пользователя, для которого сгенерированы рекомендации
+                  recommendations:
+                    type: array
+                    description: Список рекомендованных товаров, отсортированных по релевантности
+                    items:
+                      $ref: '#/components/schemas/RecommendationItem'
+                  model_info:
+                    type: object
+                    description: Информация о модели, использованной для генерации рекомендаций
+                    properties:
+                      model_id:
+                        type: string
+                        format: uuid
+                        description: Идентификатор использованной ML-модели
+                      model_version:
+                        type: string
+                        description: Версия использованной ML-модели
+                      ab_group:
+                        type: string
+                        description: A/B тестовая группа, к которой принадлежал пользователь
+                  response_metadata:
+                    type: object
+                    description: Дополнительные метаданные ответа
+                    properties:
+                      cache_hit:
+                        type: boolean
+                        description: Флаг, указывающий, были ли рекомендации взяты из кэша
+                      generated_at:
+                        type: string
+                        format: date-time
+                        description: Время генерации рекомендаций
+                      latency_ms:
+                        type: integer
+                        description: Время ответа API в миллисекундах
+                required:
+                  - user_id
+                  - recommendations
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Пользователь не найден или рекомендации не могут быть сгенерированы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    RecommendationItem:
+      type: object
+      properties:
+        item_id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор рекомендованного товара
+        score:
+          type: number
+          format: float
+          description: Скоринг релевантности товара (чем выше, тем релевантнее)
+        rank:
+          type: integer
+          description: Место товара в списке рекомендаций (начиная с 1)
+      required:
+        - item_id
+        - score
+        - rank
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Код ошибки
+        message:
+          type: string
+          description: Подробное описание ошибки
+        details:
+          type: string
+          description: Дополнительные детали ошибки (опционально)
+      required:
+        - code
+        - message
