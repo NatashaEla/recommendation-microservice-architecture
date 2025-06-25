@@ -1,4 +1,4 @@
-### -recommendation-_microservice_architecture
+### recommendation-microservice-architecture
 
 # Система Персонализированных Рекомендаций: Микросервисная Архитектура
 
